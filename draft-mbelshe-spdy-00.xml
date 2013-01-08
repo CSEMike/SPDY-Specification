@@ -255,7 +255,7 @@
             
             <t>We expect most streams to have at most a single dependency, but this is not a protocol requirement.  Referencing a stream more than once in a single REPRI frame indicates multiple parents.  A server implementation which does not support multiple parents MUST use the last referenced parent.  Clients which specify multiple parents SHOULD put the most important parent last.</t>
 
-            <t>Priority values are interpreted as an integer.  0 represents the highest priority with larger values indicating lower priorities.</t>
+            <t>Priority values are interpreted as an integer.  Lower numbers in the priority field indicate greater importance.  A value of '0' in the priority field indicates highest importance.</t>
             
             <t>Server push streams are assigned an initial dependency or priority at the discretion of the server.  A conformant implementation SHOULD create a dependency on the push stream's <xref target="ServerPushServerImplementation">associated-to-stream-id</xref>.</t>
           </section>  <!-- Stream priorities and dependencies -->
@@ -1118,7 +1118,7 @@
               </list>
             </t>
 
-            <t>The user-agent is free to prioritize requests as it sees fit. If the user-agent cannot make progress without receiving a resource, it should attempt to raise the priority of that resource. Resources such as images, SHOULD generally use the lowest priority.</t>
+            <t>The user-agent is free to prioritize or reprioritize requests as it sees fit. If the user-agent cannot make progress without receiving a resource, it SHOULD attempt to raise the priority of that resource. Bulk transfers (e.g., images) SHOULD be given lower priority by adjusting stream dependencies or increasing the stream  priority value.  For more guidance regarding prioritization policies, see <xref target="DependencyPolicies"></xref>.</t>
 
             <t>If a client sends a SYN_STREAM without all of the method, host, path, scheme, and version headers, the server MUST reply with a HTTP 400 Bad Request reply.</t>
           </section>
@@ -1364,7 +1364,7 @@
         </section>
 
         <section title="Server Scheduling">
-          <t>A conformant server should respect the semantics of priorities and dependencies in its scheduling policy.  Priorities indicate a preference for weighted scheduling (e.g., using a lottery scheduler) among root nodes (i.e., those created with a priority and not a parent).  Interior nodes with identical parents are weighted equally.</t>
+          <t>A conformant server should respect the semantics of priorities and dependencies in its scheduling policy.  Priorities indicate a preference for weighted scheduling (e.g., using a lottery scheduler) among root nodes (i.e., those without a parent).  Interior nodes with identical parents are weighted equally.</t>
 
           <t>Server scheduling should reflect guidance from dependencies, but it need not be strict.  If all streams in a dependency structure have data available to write at the server, writes should be serviced first for root nodes, then children, then grandchildren, and so on.  But, children that are ready to write should not starve to enforce a scheduling dependency.  In other words, scheduling dependencies should not lead servers to waste capacity.  If data is not available to continue writing the root, for example, a child ready to write should do so.</t>
 
@@ -1372,9 +1372,13 @@
         </section>
         
         <section title="Garbage Collecting Dependency Information">
-          <t>SPDY implementations must take care to protect themselves from the use of dependencies as a DoS vector.  The protocol provides wide flexibility in this regard; servers are free to drop dependency or priority data at any time without sacrificing correctness.</t>
+          <t>SPDY implementations must take care to protect themselves from the use of dependencies as a denial of service vector.  The protocol provides wide flexibility in this regard. Since prioritization only  indicates an ordering that serves to improve user experience, servers are free to drop dependency or priority data at any time without sacrificing correctness.</t>
 
-          <t>Otherwise, we envision servers choosing a timeout value for dependency nodes that is large enough to cover the likely time period during which a client may reference a node; e.g., page load time + rtt.  Alternatively, a large fixed number of dependencies may be maintained per-session with LRU eviction.  Either of these policies is likely to sharply limit the number of missed dependency references.  On the client side, browsers should take care to manage dependencies according to server policies, e.g., by creating new dependency structures rather than referring to those that have likely timed out and been garbage collected.</t>
+          <t>Servers should avoid garbage collecting dependency structures likely to be referenced by clients.  A race exists between expiration of dependency information about a stream and when the client references that stream id in subsequent messages.  For example, the server may finish transferring page HTML and close the stream before receiving resource requests from the client.  The dependencies for resource requests are likely to reference the HTML stream id. Thus, dependency information should not be discarded immediately when a stream is closed.</t>
+
+            <t>Typically, we envision servers choosing a timeout value for dependency nodes that is large enough to cover the likely time period during which a client may reference a node; e.g., page load time + rtt.  Alternatively, a large fixed number of dependencies may be maintained per-session with LRU eviction.  Either of these policies is likely to sharply limit the number of missed dependency references.</t>
+            
+            <t>On the client side, browsers should take care to manage dependencies according to server policies, e.g., by creating new dependency structures rather than referring to those that have likely timed out and been garbage collected.</t>
 
           <t>While missed references may be rare, they are unavoidable in an asynchronous system with timeouts. (This is why we require that servers accept as correct any dependency id, regardless of whether or not it corresponds to an active stream.)  In cases where a reference is made to an unknown identifier at the server, the server may create the referenced id as a new root for future reference or ignore the dependency entirely.</t>
         </section>  
