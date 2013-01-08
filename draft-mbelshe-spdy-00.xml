@@ -34,7 +34,13 @@
           <email>fenix@google.com</email>
         </address>
       </author>
-      <date month="August" year="2012" />
+      <author initials="M." surname="Piatek" fullname="Michael Piatek">
+        <organization>Google, Inc</organization>
+        <address>
+          <email>piatek@google.com</email>
+        </address>
+      </author>
+      <date month="January" year="2013" />
       <area>Applications</area>
       <keyword>HTTP</keyword>
       <abstract>
@@ -244,11 +250,15 @@
             </section>
           </section>
 
-          <section anchor="StreamPriority" title="Stream priority">
-            <t>The creator of a stream assigns a priority for that stream.  Priority is represented as an integer from 0 to 7.  0 represents the highest priority and 7 represents the lowest priority.</t>
+          <section anchor="StreamPriority" title="Stream priorities and dependencies">
+            <t>The creator of a stream assigns a priority or a dependency for that stream, indicated by the priority bit, P.  P is exclusive; a stream may be assigned a priority or a parent dependency upon creation, but not both.  There are no constraints on the value of PriOrDep; any 31 bit value is valid.  Thus, a stream may refer to a dependency identifier that does not correspond to any current or previous stream ID.  This is a deliberate design choice that increases flexibility for clients when structuring dependencies, a topic we expand upon when discussing <xref target="DependencyPolicies">policies</xref>.</t>
+            
+            <t>We expect most streams to have at most a single dependency, but this is not a protocol requirement.  Referencing a stream more than once in a single REPRI frame indicates multiple parents.  A server implementation which does not support multiple parents MUST use the last referenced parent.  Clients which specify multiple parents SHOULD put the most important parent last.</t>
 
-            <t>The sender and recipient SHOULD use best-effort to process streams in the order of highest priority to lowest priority.</t>
-          </section>
+            <t>Priority values are interpreted as an integer.  0 represents the highest priority with larger values indicating lower priorities.</t>
+            
+            <t>Server push streams are assigned an initial dependency or priority at the discretion of the server.  A conformant implementation SHOULD create a dependency on the push stream's <xref target="ServerPushServerImplementation">associated-to-stream-id</xref>.</t>
+          </section>  <!-- Stream priorities and dependencies -->
 
           <section title="Stream headers">
             <t>Streams carry optional sets of name/value pair headers which carry metadata about the stream.  After the stream has been created, and as long as the sender is not <xref target="StreamClose">closed</xref> or <xref target="StreamHalfClose">half-closed</xref>, each side may send HEADERS frame(s) containing the header data.  Header data can be sent in multiple HEADERS frames, and HEADERS frames may be interleaved with data frames.</t>
@@ -313,6 +323,7 @@
             <c> 0x9</c> <c> <xref target="WINDOW_UPDATE">WINDOW_UPDATE</xref></c>
             <c> 0xa</c> <c> <xref target="CREDENTIAL">CREDENTIAL</xref></c>
             <c> 0xb</c> <c> <xref target="PUSH_PROMISE">PUSH_PROMISE</xref></c>
+            <c> 0xc</c> <c> <xref target="REPRI">REPRI</xref></c>
           </texttable>
           <t> Shared components of several control frames: <xref target="HeaderBlock">Name/Value Header Block</xref></t>
 
@@ -325,10 +336,10 @@
                 | Length(16)      |Flags(8)|1| Stream Id(31)                    |    0x1 | -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
 
-                8        9,10,11..N
-                +---|-----+=========================+
-                |Pri|XXXXX| Name/Value Header Block |
-                +---|-----+=========================+
+                8         9        10       11       12,13,14..N
+                +-+-------+--------+--------+--------+=========================+
+                |P| PriOrDep(31)                     | Name/Value Header Block |
+                +-+-------+--------+--------+--------+=========================+
               </artwork>
             </figure>
 
@@ -344,15 +355,15 @@
 
             <t>Associated-To-Stream-ID: The 31-bit identifier for a stream which this stream is associated to.  If this stream is independent of all other streams, it should be 0.</t>
 
-            <t>Priority: A 3-bit <xref target="StreamPriority">priority</xref> field.</t>
+            <t>Priority bit (P): A bit indicating whether the following PriOrDep bits specify a stream priority (P=1) or a stream ID on which the new stream depends (P=0).</t>
 
-            <t>Unused: 5 bits of unused space, reserved for future use.</t>
+            <t>PriOrDep: Depending on the value of the priority bit, either the <xref target="StreamPriority">priority</xref> of the new stream or a stream ID on which the new stream depends.</t>
 
             <t>Name/Value Header Block:  A set of name/value pairs carried as part of the SYN_STREAM.  <xref target="HeaderBlock">see Name/Value Header Block</xref>.</t>
 
             <t>If an endpoint receives a SYN_STREAM which is larger than the implementation supports, it MAY send a RST_STREAM with error code FRAME_TOO_LARGE.  All implementations MUST support the minimum size limits defined in <xref target="ControlFrames">the Control Frames section</xref>.</t>
 
-          </section>
+          </section>  <!-- SYN_STREAM -->
 
           <section anchor="SYN_REPLY" title="SYN_REPLY">
             <t>SYN_REPLY indicates the acceptance of a stream creation by the recipient of a SYN_STREAM frame.</t>
@@ -490,9 +501,11 @@
                   <t>bit 2: ws</t>
                   <t>bit 3: wss</t>
                 </list>
+                <t>10 - SETTINGS_MAX_CONCURRENT_DEPENDENCY_SCHEDULING_NODES allows the server to indicate resource limits for dependency scheduling, e.g., to limit memory consumption.  A value of 0 indicates that the server does not support dependency scheduling.  Servers SHOULD select a value greater than or equal to MAX_CONCURRENT_STREAMS.  This value is advisory.  Clients SHOULD respect the stated server limit, but servers MUST be robust to a client that exceeds it.</t>
+                <t>11 - SETTINGS_DEPENDENCY_SCHEDULING_NODE_TIMEOUT_MS indicates how long the server will maintain dependency nodes referenced by the client.  The value is an interval in milliseconds.  This allows the client to estimate if previously created dependency relationships are still available for reference at the server.  This value is advisory.  Servers SHOULD maintain dependencies for at least as long as associated streams are active, but a server MAY drop dependency information at any time regardless of previous statements made in SETTINGS.</t>
               </list>
             </t>
-
+            
             <t>Value: A 32-bit value.</t>
 
             <t>The message is intentionally extensible for future information which may improve client-server communications. The sender does not need to send every type of ID/value. It must only send those for which it has accurate values to convey. When multiple ID/value pairs are sent, they should be sent in order of lowest id to highest id.  A single SETTINGS frame MUST not contain multiple values for the same ID.  If the recipient of a SETTINGS frame discovers multiple values for the same ID, it MUST ignore all values except the first one.</t>
@@ -709,7 +722,45 @@
 
             <t>If an endpoint receives a PUSH_PROMISE which is larger than the implementation supports, it MAY send a RST_STREAM with error code FRAME_TOO_LARGE.  All implementations MUST support the minimum size limits defined in <xref target="ControlFrames">the Control Frames section</xref>.</t>
 
-          </section>
+          </section>  <!-- PUSH_PROMISE -->
+          
+          <section anchor="REPRI" title="REPRI">
+            <t>The REPRI control frame updates the dependency pointers and/or priorities of existing <xref target="StreamPriority">streams</xref>.</t>
+            <figure>
+              <artwork>
+          0        1        2        3         4        5        6        7
+      +--------+--------+--------+-|-------+--------+--------+--------+--------+
+      | Length(16)      |Flags(8)|1| Dependency Id(31)                |    0xc | -&gt;
+      +--------+--------+--------+-|-------+--------+--------+--------+--------+
+
+          8        9        10        11   
+      +-+-------+--------+--------+--------+
+      |P| PriOrDep(31)                     |  optionally followed by:
+      +-+-------+--------+--------+--------+
+      
+      DependencyPriOrDep pairs, where a DependencyPriOrDep pair is:
+
+      +-|-------+--------+--------+--------+-|------+--------+--------+--------+
+      |X| Dependency Id (31)               |P| PriOrDep(31)                    |
+      +-|-------+--------+--------+--------+-|------+--------+--------+--------+
+              </artwork>
+            </figure>
+            
+            <t>Flags: There are no valid flags for the REPRI frame.</t>
+
+            <t>Length: The length is the number of bytes that follow the length field in the frame.  For REPRI frames, this is 10 bytes plus 8 bytes for each DependencyPriOrDep pair.</t>
+
+            <t>Dependency Id: The 31-bit identifier for the stream to be updated with the required PriOrDep field.</t>
+            
+            <t>Priority bit (P), PriOrDep: A bit and 31-bit identifier indicating the priority or dependency to be applied to the Dependency Id.  The semantics of these fields are identical to their analogues in the <xref target="SYN_STREAM">SYN_STREAM frame</xref>.</t>
+            
+            <t>DependencyPriOrDep pairs: To support batched updates of dependencies, an optional list of DependencyPriOrDep pairs with identical semantics may follow the required frame fields.  The number of such pairs is determined by examining the frame length.
+            <vspace blankLines="1" />
+            number-of-pairs = ((length - 12) / 8)
+            <vspace blankLines="1" />
+            12 required bytes, 8 bytes from len(Dependency Id) + len(PriOrDep)</t>
+
+          </section>  <!-- REPRI -->
 
           <section anchor="HeaderBlock" title="Name/Value Header Block">
 
@@ -1126,8 +1177,8 @@
 
           <t>Implementation note:  Similarly with inlining, with server push it is theoretically possible for servers to push large amounts of content or resources to the user-agent.  Browsers MUST implement throttles to protect against unreasonable push attacks, just as they must react reasonably to abuse of inlining. The server-push mechanism should make this easier to deal with than inlining in basically every case.</t>
 
-          <section title="Server implementation">
-            <t>When the server intends to push a resource to the user-agent, it promises that it will opens a new stream in the future (but not now) by sending a PUSH_PROMISE frame.  The PUSH_PROMISE frame MUST include an Associated-To-Stream-ID, Prmoised-Stream-ID, and MUST ensure that headers for ":scheme", ":host", ":path" representing the URL for the resource being pushed are either already present in the implied headers context (i.e. the request headers), or it must override the headers which do not match the pushed resource. The ":path" MUST always be different from the originally request resource.  The stream-IDs represented in the Promised-Stream-ID field MUST NOT count towards the MAX_CONCURRENT_STREAMS limit. When the server is ready to send the resource, it will send a SYN_REPLY with the stream-ID indicated by the Promised-Stream-ID send in the PUSH_PROMISE frame earlier. As with any other SYN_REPLY, subsequent headers may follow in HEADERS frames. The purpose of the association is so that the user-agent can differentiate which request induced the pushed stream; without it, if the user-agent had two tabs open to the same page, each pushing unique content under a fixed URL, the user-agent would not be able to differentiate the requests.</t>
+          <section title="Server implementation" anchor="ServerPushServerImplementation">
+            <t>When the server intends to push a resource to the user-agent, it promises that it will opens a new stream in the future (but not now) by sending a PUSH_PROMISE frame.  The PUSH_PROMISE frame MUST include an Associated-To-Stream-ID, Promised-Stream-ID, and MUST ensure that headers for ":scheme", ":host", ":path" representing the URL for the resource being pushed are either already present in the implied headers context (i.e. the request headers), or it must override the headers which do not match the pushed resource. The ":path" MUST always be different from the originally request resource.  The stream-IDs represented in the Promised-Stream-ID field MUST NOT count towards the MAX_CONCURRENT_STREAMS limit. When the server is ready to send the resource, it will send a SYN_REPLY with the stream-ID indicated by the Promised-Stream-ID send in the PUSH_PROMISE frame earlier. As with any other SYN_REPLY, subsequent headers may follow in HEADERS frames. The purpose of the association is so that the user-agent can differentiate which request induced the pushed stream; without it, if the user-agent had two tabs open to the same page, each pushing unique content under a fixed URL, the user-agent would not be able to differentiate the requests.</t>
 
             <t>The Associated-To-Stream-ID must be the ID of an existing, open stream.  The reason for this restriction is to have a clear endpoint for pushed content.  If the user-agent requested a resource on stream 11, the server replies on stream 11.  It can push any number of additional streams to the client before sending a FLAG_FIN on stream 11.  However, once the originating stream is closed no further push streams may be associated with it.  The pushed streams do not need to be closed (FIN set) before the originating stream is closed, they only need to be created before the originating stream closes.</t>
 
@@ -1300,7 +1351,35 @@
           <t>A subtle but important point is that server push streams must be declared before the associated stream is closed.  The reason for this is so that proxies have a lifetime for which they can discard information about previous streams.  If a pushed stream could associate itself with an already-closed stream, then endpoints would not have a specific lifecycle for when they could disavow knowledge of the streams which went before.</t>
         </section>
       </section>
+      
+      <section title="Stream Priorities and Dependencies" anchor="DependencyPolicies">
+        <t>Both priorities and stream dependencies are advisory hints.  Browsers may adopt sophisticated policies or leave dependencies entirely unspecified.  Similarly, servers may incorporate dependency hints into sophisticated schedulers or ignore them entirely.  The protocol mechanisms for encoding dependencies are designed to be simple.  But, these mechanisms afford a flexible set of policies depending on how browsers and servers use them.  This section expands on several policy considerations.</t>
 
+        <section title="Assigning and Updating Dependencies">
+          <t>Stream priorities and dependencies are designed to improve performance by allocating bandwidth capacity to the most important resource transfers first.  Clients are free to choose dependencies and priorities as desired to improve performance.  As a starting point, we consider a policy that serializes resources transfers in the order required by the browser's parser.</t>
+
+          <t>Sharing bandwidth between resource transfers may degrade performance as measured by page-load time, e.g., when transferring two Javascript resources that cannot be executed until transfer is complete, or two video chunks that will be played back-to-back.  In these circumstances, the browser may wish to specify an ordering.  HTML before script1.js before script2.js before image.png, for example, or video_chunk1 before video_chunk2 and so on.  Moreover, changing the priority of the HTML transfer itself may benefit performance; e.g., a large blocking script will be interpreted and executed more quickly if it does not compete for bandwidth capacity with a large HTML transfer.</t>
+
+          <t>Clients should not specify dependencies for servers that do not support them (as indicated by SETTINGS_MAX_CONCURRENT_DEPENDENCY_SCHEDULING_NODES in the SETTINGS frame).  Instead, an intelligent client may fall back to specifying priorities only, thereby improving performance relative to specifying dependencies that will be ignored.</t>
+        </section>
+
+        <section title="Server Scheduling">
+          <t>A conformant server should respect the semantics of priorities and dependencies in its scheduling policy.  Priorities indicate a preference for weighted scheduling (e.g., using a lottery scheduler) among root nodes (i.e., those created with a priority and not a parent).  Interior nodes with identical parents are weighted equally.</t>
+
+          <t>Server scheduling should reflect guidance from dependencies, but it need not be strict.  If all streams in a dependency structure have data available to write at the server, writes should be serviced first for root nodes, then children, then grandchildren, and so on.  But, children that are ready to write should not starve to enforce a scheduling dependency.  In other words, scheduling dependencies should not lead servers to waste capacity.  If data is not available to continue writing the root, for example, a child ready to write should do so.</t>
+
+          <t>Finally, we point out that servers may improve performance even if clients do not provide dependency information or priorities.  For example, an intelligent server may inspect the content type of resources to make informed prioritization decisions on its own without client guidance.  (However, respecting client-provided hints when available is likely to improve performance further, as clients have detailed knowledge of parser dependencies.)</t>
+        </section>
+        
+        <section title="Garbage Collecting Dependency Information">
+          <t>SPDY implementations must take care to protect themselves from the use of dependencies as a DoS vector.  The protocol provides wide flexibility in this regard; servers are free to drop dependency or priority data at any time without sacrificing correctness.</t>
+
+          <t>Otherwise, we envision servers choosing a timeout value for dependency nodes that is large enough to cover the likely time period during which a client may reference a node; e.g., page load time + rtt.  Alternatively, a large fixed number of dependencies may be maintained per-session with LRU eviction.  Either of these policies is likely to sharply limit the number of missed dependency references.  On the client side, browsers should take care to manage dependencies according to server policies, e.g., by creating new dependency structures rather than referring to those that have likely timed out and been garbage collected.</t>
+
+          <t>While missed references may be rare, they are unavoidable in an asynchronous system with timeouts. (This is why we require that servers accept as correct any dependency id, regardless of whether or not it corresponds to an active stream.)  In cases where a reference is made to an unknown identifier at the server, the server may create the referenced id as a new root for future reference or ignore the dependency entirely.</t>
+        </section>  
+      </section>  <!-- Stream Priorities and Dependencies -->
+      
       <section title="Security Considerations">
         <section title="Use of Same-origin constraints">
           <t>This specification uses the <xref target="RFC6454">same-origin policy</xref> in all cases where verification of content is required.</t>
@@ -1361,7 +1440,6 @@
 
             <t>ONGOING: Definition of cert-data push</t>
             <t>ONGOING: Definition of name-resolution push</t>
-            <t>ONGOING: Redefining prioritization</t>
 
             <t>TODO: Modification of flow-control; allow two-levels of flow control so as to allow greater stream concurrency safely</t>
             <t>TODO: Add the 'blocked-on-flow-control' notification. Experience has shown that limits are too easy to get wrong, and this helps to self-correct this problem</t>
