@@ -251,9 +251,13 @@
           </section>
 
           <section anchor="StreamPriority" title="Stream priorities and dependencies">
-            <t>The creator of a stream assigns a priority or a dependency for that stream, indicated by the priority bit, P.  P is exclusive; a stream may be assigned a priority or a parent dependency upon creation, but not both.  There are no constraints on the value of PriOrDep; any 31 bit value is valid.  Thus, a stream may refer to a dependency identifier that does not correspond to any current or previous stream ID.  This is a deliberate design choice that increases flexibility for clients when structuring dependencies, a topic we expand upon when discussing <xref target="DependencyPolicies">policies</xref>.</t>
+            <t>The creator of a stream assigns a priority or a dependency for that stream, indicated by the priority bit, P.  P is exclusive; a stream may be assigned a priority or a parent dependency upon creation, but not both.  The value of PriOrDep MUST correspond to an active stream.</t>
             
-            <t>We expect most streams to have at most a single dependency, but this is not a protocol requirement.  Referencing a stream more than once in a single REPRI frame indicates multiple parents.  A server implementation which does not support multiple parents MUST use the last referenced parent.  Clients which specify multiple parents SHOULD put the most important parent last.</t>
+            <t>An active stream is one for which a client has received a SYN_STREAM frame and has not yet sent a FIN_ACK frame.  It is a protocol error to declare a dependency on a stream for which a FIN_ACK has been sent.  A server MUST retain dependency relationships for a stream until a FIN_ACK is received from the client or the session is closed.  It is a protocol error for a client to leave a dangling reference to a stream for which the FIN_ACK frame has been sent.  Clients MUST update dependencies using <xref target="REPRI">REPRI</xref> frames as necessary to avoid dangling references to inactive streams.</t>
+            
+            <t>A dependency may be ordered or unordered.  Ordering is specified by the value of FLAG_ORDERED in the SYN_STREAM frame.  Stream ordering is a hint for servers that suggests how best to schedule stream writes to improve pageload performance. (<xref target="DependencyPolicies"/>)</t>
+            
+            <t>Each stream may have at most one dependency.  Each stream may be dependend on by at most one stream.  Together, these invariants mean that stream dependencies define a partially ordered list.</t>
 
             <t>Priority values are interpreted as an integer.  0 represents the highest priority with larger values indicating lower priorities.</t>
             
@@ -324,6 +328,7 @@
             <c> 0xa</c> <c> <xref target="CREDENTIAL">CREDENTIAL</xref></c>
             <c> 0xb</c> <c> <xref target="PUSH_PROMISE">PUSH_PROMISE</xref></c>
             <c> 0xc</c> <c> <xref target="REPRI">REPRI</xref></c>
+            <c> 0xd</c> <c> <xref target="FIN_ACK">FIN_ACK</xref></c>
           </texttable>
           <t> Shared components of several control frames: <xref target="HeaderBlock">Name/Value Header Block</xref></t>
 
@@ -346,6 +351,7 @@
             <t>Flags: Flags related to this frame. Valid flags are:
               <list>
                 <t>0x01 = FLAG_FIN - marks this frame as the last frame to be transmitted on this stream and puts the sender in the <xref target="StreamHalfClose">half-closed</xref> state.</t>
+                <t>0x02 = FLAG_ORDERED - indicates that the dependency to the stream named in PriOrDep is ordered.  It is a protocol error to set this flag if the priority bit is set.</t>
               </list>
             </t>
 
@@ -501,8 +507,6 @@
                   <t>bit 2: ws</t>
                   <t>bit 3: wss</t>
                 </list>
-                <t>10 - SETTINGS_MAX_CONCURRENT_DEPENDENCY_SCHEDULING_NODES allows the server to indicate resource limits for dependency scheduling, e.g., to limit memory consumption.  A value of 0 indicates that the server does not support dependency scheduling.  Servers SHOULD select a value greater than or equal to MAX_CONCURRENT_STREAMS.  This value is advisory.  Clients SHOULD respect the stated server limit, but servers MUST be robust to a client that exceeds it.</t>
-                <t>11 - SETTINGS_DEPENDENCY_SCHEDULING_NODE_TIMEOUT_MS indicates how long the server will maintain dependency nodes referenced by the client.  The value is an interval in milliseconds.  This allows the client to estimate if previously created dependency relationships are still available for reference at the server.  This value is advisory.  Servers SHOULD maintain dependencies for at least as long as associated streams are active, but a server MAY drop dependency information at any time regardless of previous statements made in SETTINGS.</t>
               </list>
             </t>
             
@@ -730,37 +734,50 @@
               <artwork>
           0        1        2        3         4        5        6        7
       +--------+--------+--------+-|-------+--------+--------+--------+--------+
-      | Length(16)      |Flags(8)|1| Dependency Id(31)                |    0xc | -&gt;
+      | Length(16)      |Flags(8)|1| Stream ID(31)                    |    0xc | -&gt;
       +--------+--------+--------+-|-------+--------+--------+--------+--------+
 
           8        9        10        11   
       +-+-------+--------+--------+--------+
-      |P| PriOrDep(31)                     |  optionally followed by:
+      |P| PriOrDep(31)                     |
       +-+-------+--------+--------+--------+
       
-      DependencyPriOrDep pairs, where a DependencyPriOrDep pair is:
-
-      +-|-------+--------+--------+--------+-|------+--------+--------+--------+
-      |X| Dependency Id (31)               |P| PriOrDep(31)                    |
-      +-|-------+--------+--------+--------+-|------+--------+--------+--------+
               </artwork>
             </figure>
             
-            <t>Flags: There are no valid flags for the REPRI frame.</t>
+            <t>Flags: Flags related to this frame. Valid flags are:
+              <list>
+                <t>0x01 = FLAG_ORDERED - indicates that the dependency to the stream named in PriOrDep is ordered.  It is a protocol error to set this flag if the priority bit is set.</t>
+              </list>
+            </t>
 
-            <t>Length: The length is the number of bytes that follow the length field in the frame.  For REPRI frames, this is 10 bytes plus 8 bytes for each DependencyPriOrDep pair.</t>
+            <t>Length: This frame is always 12 bytes long.</t>
 
-            <t>Dependency Id: The 31-bit identifier for the stream to be updated with the required PriOrDep field.</t>
+            <t>Stream ID: The 31-bit stream ID to be updated with the required PriOrDep field.</t>
             
-            <t>Priority bit (P), PriOrDep: A bit and 31-bit identifier indicating the priority or dependency to be applied to the Dependency Id.  The semantics of these fields are identical to their analogues in the <xref target="SYN_STREAM">SYN_STREAM frame</xref>.</t>
-            
-            <t>DependencyPriOrDep pairs: To support batched updates of dependencies, an optional list of DependencyPriOrDep pairs with identical semantics may follow the required frame fields.  The number of such pairs is determined by examining the frame length.
-            <vspace blankLines="1" />
-            number-of-pairs = ((length - 12) / 8)
-            <vspace blankLines="1" />
-            12 required bytes, 8 bytes from len(Dependency Id) + len(PriOrDep)</t>
+            <t>Priority bit (P), PriOrDep: A bit and 31-bit value indicating the priority or dependency to be applied to the Stream ID.  The semantics of these fields are identical to their analogues in the <xref target="SYN_STREAM">SYN_STREAM frame</xref>.</t>
 
           </section>  <!-- REPRI -->
+          
+          <section anchor="FIN_ACK" title="FIN_ACK">
+            <t>The FIN_ACK control frame is sent by the client to the server to acknowledge a frame sent by the server with the FLAG_FIN bit set.  FIN acknowledgement ensures a consistent view of the active streams between the client and server.</t>
+            <figure>
+              <artwork>
+          0        1        2        3         4        5        6        7
+      +--------+--------+--------+-|-------+--------+--------+--------+--------+
+      | Length(16)      |Flags(8)|0| Stream ID (31)                   |    0xd |
+      +--------+--------+--------+-|-------+--------+--------+--------+--------+
+
+              </artwork>
+            </figure>
+            
+            <t>Flags: There are no valid flags for the FIN_ACK frame.</t>
+
+            <t>Length: This frame is always 8 bytes long.</t>
+
+            <t>Stream ID: The stream for which a FLAG_FIN frame is being acknowledged.</t>
+
+          </section>  <!-- FIN_ACK -->
 
           <section anchor="HeaderBlock" title="Name/Value Header Block">
 
@@ -1359,24 +1376,22 @@
           <t>Stream priorities and dependencies are designed to improve performance by allocating bandwidth capacity to the most important resource transfers first.  Clients are free to choose dependencies and priorities as desired to improve performance.  As a starting point, we consider a policy that serializes resources transfers in the order required by the browser's parser.</t>
 
           <t>Sharing bandwidth between resource transfers may degrade performance as measured by page-load time, e.g., when transferring two Javascript resources that cannot be executed until transfer is complete, or two video chunks that will be played back-to-back.  In these circumstances, the browser may wish to specify an ordering.  HTML before script1.js before script2.js before image.png, for example, or video_chunk1 before video_chunk2 and so on.  Moreover, changing the priority of the HTML transfer itself may benefit performance; e.g., a large blocking script will be interpreted and executed more quickly if it does not compete for bandwidth capacity with a large HTML transfer.</t>
-
-          <t>Clients should not specify dependencies for servers that do not support them (as indicated by SETTINGS_MAX_CONCURRENT_DEPENDENCY_SCHEDULING_NODES in the SETTINGS frame).  Instead, an intelligent client may fall back to specifying priorities only, thereby improving performance relative to specifying dependencies that will be ignored.</t>
         </section>
 
         <section title="Server Scheduling">
-          <t>A conformant server should respect the semantics of priorities and dependencies in its scheduling policy.  Priorities indicate a preference for weighted scheduling (e.g., using a lottery scheduler) among root nodes (i.e., those created with a priority and not a parent).  Interior nodes with identical parents are weighted equally.</t>
+          <t>A conformant server should respect the semantics of priorities and dependencies in its scheduling policy.  Priorities indicate a preference for weighted scheduling (e.g., using a lottery scheduler) among streams with priority values.  Streams with identical priorities should be weighted equally.</t>
+          
+          <t>Stream dependencies define a partially ordered list.  The head of the list is a stream with a priority, and each dependency link in the list has a type: either ordered or unordered.  Ordering links indicates a preference for ordering writes.  For example, an ordered dependency from script2.js to script1.js means that the client prefers to receive script1.js before script2.js.  An unordered dependency indicates that capacity should be shared, e.g., between transfers for two progressive jpeg images.</t>
 
-          <t>Server scheduling should reflect guidance from dependencies, but it need not be strict.  If all streams in a dependency structure have data available to write at the server, writes should be serviced first for root nodes, then children, then grandchildren, and so on.  But, children that are ready to write should not starve to enforce a scheduling dependency.  In other words, scheduling dependencies should not lead servers to waste capacity.  If data is not available to continue writing the root, for example, a child ready to write should do so.</t>
+          <t>Server scheduling should reflect guidance from dependencies, but it need not be strict.  If all the streams in a dependency list have data available to write at the server, writes should be serviced first for the head of the list, then its dependent stream,  and so on, with sharing among unordered segments of the list.  But, dependent streams that are ready to write should not starve to enforce a scheduling dependency.  In other words, scheduling dependencies should not lead servers to waste capacity.  If data is not available to continue writing to the stream at the head of a list, for example, a successor ready to write should do so.</t>
 
           <t>Finally, we point out that servers may improve performance even if clients do not provide dependency information or priorities.  For example, an intelligent server may inspect the content type of resources to make informed prioritization decisions on its own without client guidance.  (However, respecting client-provided hints when available is likely to improve performance further, as clients have detailed knowledge of parser dependencies.)</t>
         </section>
         
         <section title="Garbage Collecting Dependency Information">
-          <t>SPDY implementations must take care to protect themselves from the use of dependencies as a DoS vector.  The protocol provides wide flexibility in this regard; servers are free to drop dependency or priority data at any time without sacrificing correctness.</t>
-
-          <t>Otherwise, we envision servers choosing a timeout value for dependency nodes that is large enough to cover the likely time period during which a client may reference a node; e.g., page load time + rtt.  Alternatively, a large fixed number of dependencies may be maintained per-session with LRU eviction.  Either of these policies is likely to sharply limit the number of missed dependency references.  On the client side, browsers should take care to manage dependencies according to server policies, e.g., by creating new dependency structures rather than referring to those that have likely timed out and been garbage collected.</t>
-
-          <t>While missed references may be rare, they are unavoidable in an asynchronous system with timeouts. (This is why we require that servers accept as correct any dependency id, regardless of whether or not it corresponds to an active stream.)  In cases where a reference is made to an unknown identifier at the server, the server may create the referenced id as a new root for future reference or ignore the dependency entirely.</t>
+          <t>SPDY implementations must take care to protect themselves from the use of dependencies as a DoS vector.  Because the dependency relationships of a stream have the same lifetime as the stream itself, servers may limit resource consumption using the MAX_CONCURRENT_STREAMS setting.</t>
+            
+          <t>Dependency relationships for a stream may be safely discarded by the server after a FIN_ACK frame is received for the stream.  Recall that all stream dependencies must refer to an active stream ID, so it is a protocol error for a client to leave a dangling dependency from an active stream to another stream for which a FIN_ACK has been sent.</t>
         </section>  
       </section>  <!-- Stream Priorities and Dependencies -->
       
