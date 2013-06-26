@@ -149,7 +149,7 @@
           <section anchor="ControlFrames" title="Control frames">
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1| Num-of-Entries-or-Stream-ID-or-ID|Type(8) | -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -179,7 +179,7 @@
           <section anchor="DataFrames" title="Data frames">
             <figure>
               <artwork>
-                0        1        2        3         4        5        6      7..N     
+                0        1        2        3         4        5        6      7..N
                 +--------+--------+--------+-|-------+--------+--------+--------+========+
                 | Length(16)      |Flags(8)|0| Stream ID (31)                   |  Data  |
                 +--------+--------+--------+-|-------+--------+--------+--------+========+
@@ -251,17 +251,36 @@
           </section>
 
           <section anchor="StreamPriority" title="Stream priorities and dependencies">
-            <t>The creator of a stream assigns a priority or a dependency for that stream, indicated by the priority bit, P.  P is exclusive; a stream may be assigned a priority or a parent dependency upon creation, but not both.  The value of PriOrDep MUST correspond to an active stream.</t>
-            
-            <t>An active stream is one for which a client has received a SYN_STREAM frame and has not yet sent a FIN_ACK frame.  It is a protocol error to declare a dependency on a stream for which a FIN_ACK has been sent.  A server MUST retain dependency relationships for a stream until a FIN_ACK is received from the client or the session is closed.  It is a protocol error for a client to leave a dangling reference to a stream for which the FIN_ACK frame has been sent.  Clients MUST update dependencies using <xref target="REPRI">REPRI</xref> frames as necessary to avoid dangling references to inactive streams.</t>
-            
-            <t>A dependency may be ordered or unordered.  Ordering is specified by the value of FLAG_ORDERED in the SYN_STREAM frame.  Stream ordering is a hint for servers that suggests how best to schedule stream writes to improve pageload performance. (<xref target="DependencyPolicies"/>)</t>
-            
-            <t>Each stream may have at most one dependency.  Each stream may be dependend on by at most one stream.  Together, these invariants mean that stream dependencies define a partially ordered list.</t>
+            <t>The creator of a stream assigns a priority or a dependency for that stream,
+	    indicated by the priority bit, P.  P is exclusive; a stream may be assigned a
+	    priority or a parent dependency upon creation, but not both.  The value of
+	    PriOrDep MUST correspond to an active stream.</t>
 
-            <t>Priority values are interpreted as an integer.  0 represents the highest priority with larger values indicating lower priorities.</t>
-            
-            <t>Server push streams are assigned an initial dependency or priority at the discretion of the server.  A conformant implementation SHOULD create a dependency on the push stream's <xref target="ServerPushServerImplementation">associated-to-stream-id</xref>.</t>
+            <t>An active stream is one for which a client has received a SYN_STREAM frame and has
+	    not yet sent a FIN_ACK frame.  It is a protocol error to declare a dependency on a
+	    stream for which a FIN_ACK has been sent.  A server MUST retain dependency
+	    relationships for a stream until a FIN_ACK is received from the client or the session
+	    is closed.  It is a protocol error for a client to leave a dangling reference to a
+	    stream for which the FIN_ACK frame has been sent.  Clients MUST update dependencies
+	    using <xref target="REPRI">REPRI</xref> frames as necessary to avoid dangling
+	    references to inactive streams.</t>
+
+            <t>A dependency may be ordered or unordered.  Ordering is specified by the value of
+	    FLAG_ORDERED in the SYN_STREAM frame.  Stream ordering is a hint for servers that
+	    suggests how best to schedule stream writes to improve pageload performance.
+	    (<xref target="DependencyPolicies"/>)</t>
+
+            <t>Each stream may have at most one dependency.  Each stream may be dependend on by
+	    at most one stream.  Together, these invariants mean that stream dependencies define
+	    a partially ordered list.</t>
+
+            <t>Priority values are interpreted as an integer.  0 represents the highest priority
+	    with larger values indicating lower priorities.</t>
+
+            <t>Server push streams are assigned an initial dependency or priority at the
+	    discretion of the server.  A conformant implementation SHOULD create a dependency on
+	    the push stream's
+	    <xref target="ServerPushServerImplementation">associated-to-stream-id</xref>.</t>
           </section>  <!-- Stream priorities and dependencies -->
 
           <section title="Stream headers">
@@ -336,7 +355,7 @@
             <t>The SYN_STREAM control frame allows the sender to asynchronously create a stream between the endpoints.  See <xref target="StreamCreation">Stream Creation</xref></t>
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7    
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1| Stream Id(31)                    |    0x1 | -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -351,7 +370,9 @@
             <t>Flags: Flags related to this frame. Valid flags are:
               <list>
                 <t>0x01 = FLAG_FIN - marks this frame as the last frame to be transmitted on this stream and puts the sender in the <xref target="StreamHalfClose">half-closed</xref> state.</t>
-                <t>0x02 = FLAG_ORDERED - indicates that the dependency to the stream named in PriOrDep is ordered.  It is a protocol error to set this flag if the priority bit is set.</t>
+                <t>0x02 = FLAG_ORDERED - indicates that the dependency to the stream named in
+		PriOrDep is ordered.  It is a protocol error to set this flag if the priority
+		bit is set.</t>
               </list>
             </t>
 
@@ -408,7 +429,7 @@
             <t>The RST_STREAM frame allows for abnormal termination of a stream.  When sent by the creator of a stream, it indicates the creator wishes to cancel the stream.  When sent by the recipient of a stream, it indicates an error or that the recipient did not want to accept the stream, so the stream should be closed.</t>
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1| Stream Id(31)                    |    0x3 | -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -451,7 +472,7 @@
             <t>Persistence of SETTINGS ID/Value pairs is done on a per origin/IP pair (the "origin" is the set of scheme, host, and port from the URI.  See <xref target="RFC6454"></xref>).  That is, when a client connects to a server, and the server persists settings within the client, the client SHOULD return the persisted settings on future connections to the same origin AND IP address and TCP port. Clients MUST NOT request servers to use the persistence features of the SETTINGS frames, and servers MUST ignore persistence related flags sent by a client.</t>
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1| Number-of-Entries(31)            |    0x4 | -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -509,7 +530,7 @@
                 </list>
               </list>
             </t>
-            
+
             <t>Value: A 32-bit value.</t>
 
             <t>The message is intentionally extensible for future information which may improve client-server communications. The sender does not need to send every type of ID/value. It must only send those for which it has accurate values to convey. When multiple ID/value pairs are sent, they should be sent in order of lowest id to highest id.  A single SETTINGS frame MUST not contain multiple values for the same ID.  If the recipient of a SETTINGS frame discovers multiple values for the same ID, it MUST ignore all values except the first one.</t>
@@ -521,7 +542,7 @@
             <t>The PING control frame is a mechanism for measuring a minimal round-trip time from the sender.  It can be sent from the client or the server.  Recipients of a PING frame should send an identical frame to the sender as soon as possible (if there is other pending data waiting to be sent, PING should take highest priority).  Each ping sent by a sender should use a unique ID.</t>
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |XXXXXXXX|1| ID(31)                           |    0x6 | -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -552,7 +573,7 @@
             <t>After sending a GOAWAY message, the sender must ignore all SYN_STREAM frames for new streams.</t>
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1|  Last-Good-Stream-ID(31)         |     0x7| -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -586,7 +607,7 @@
             <t>Here is the format of a headers frame and headers block:</t>
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1| Stream-ID(31)                    |     0x8| -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -661,13 +682,13 @@
           <section anchor="CREDENTIAL" title="CREDENTIAL">
             <t>The CREDENTIAL control frame is used by the client to send additional client certificates to the server.  A SPDY client may decide to send requests for resources from different origins on the same SPDY session if it decides that that server handles both origins.  For example if the IP address associated with both hostnames matches and the SSL server certificate presented in the initial handshake is valid for both hostnames.  However, because the SSL connection can contain at most one client certificate, the client needs a mechanism to send additional client certificates to the server.</t>
 
-            <t>The server is required to maintain a vector of client certificates associated with a SPDY session.  When the client needs to send a client certificate to the server, it will send a CREDENTIAL frame that specifies the index of the slot in which to store the certificate as well as proof that the client posesses the corresponding private key.  The initial size of this vector must be 8.  If the client provides a client certificate during the first TLS handshake, the contents of this certificate must be copied into the first slot (index 1) in the CREDENTIAL vector, though it may be overwritten by subsequent CREDENTIAL frames.  The server must exclusively use the CREDENTIAL vector when evaluating the client certificates associated with an origin.  The server may change the size of this vector by sending a SETTINGS frame with the setting SETTINGS_CLIENT_CERTIFICATE_VECTOR_SIZE value specified.  In the event that the new size is smaller than the current size, truncation occurs preserving lower-index slots as possible.</t>  
+            <t>The server is required to maintain a vector of client certificates associated with a SPDY session.  When the client needs to send a client certificate to the server, it will send a CREDENTIAL frame that specifies the index of the slot in which to store the certificate as well as proof that the client posesses the corresponding private key.  The initial size of this vector must be 8.  If the client provides a client certificate during the first TLS handshake, the contents of this certificate must be copied into the first slot (index 1) in the CREDENTIAL vector, though it may be overwritten by subsequent CREDENTIAL frames.  The server must exclusively use the CREDENTIAL vector when evaluating the client certificates associated with an origin.  The server may change the size of this vector by sending a SETTINGS frame with the setting SETTINGS_CLIENT_CERTIFICATE_VECTOR_SIZE value specified.  In the event that the new size is smaller than the current size, truncation occurs preserving lower-index slots as possible.</t>
 
             <t>TLS renegotiation with client authentication is incompatible with SPDY given the multiplexed nature of SPDY.  Specifically, imagine that the client has 2 requests outstanding to the server for two different pages (in different tabs).  When the renegotiation + client certificate request comes in, the browser is unable to determine which resource triggered the client certificate request, in order to prompt the user accordingly.</t>
 
             <figure>
               <artwork>
-                0        1        2        3         4        5        6        7     
+                0        1        2        3         4        5        6        7
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
                 | Length(16)      |Flags(8)|1| Num-of-Entries-or-Stream-ID-or-ID|     0xa| -&gt;
                 +--------+--------+--------+-|-------+--------+--------+--------+--------+
@@ -727,7 +748,7 @@
             <t>If an endpoint receives a PUSH_PROMISE which is larger than the implementation supports, it MAY send a RST_STREAM with error code FRAME_TOO_LARGE.  All implementations MUST support the minimum size limits defined in <xref target="ControlFrames">the Control Frames section</xref>.</t>
 
           </section>  <!-- PUSH_PROMISE -->
-          
+
           <section anchor="REPRI" title="REPRI">
             <t>The REPRI control frame updates the dependency pointers and/or priorities of existing <xref target="StreamPriority">streams</xref>.</t>
             <figure>
@@ -737,30 +758,37 @@
       | Length(16)      |Flags(8)|1| Stream ID(31)                    |    0xc | -&gt;
       +--------+--------+--------+-|-------+--------+--------+--------+--------+
 
-          8        9        10        11   
+          8        9        10        11
       +-+-------+--------+--------+--------+
       |P| PriOrDep(31)                     |
       +-+-------+--------+--------+--------+
-      
+
               </artwork>
             </figure>
-            
+
             <t>Flags: Flags related to this frame. Valid flags are:
               <list>
-                <t>0x01 = FLAG_ORDERED - indicates that the dependency to the stream named in PriOrDep is ordered.  It is a protocol error to set this flag if the priority bit is set.</t>
+                <t>0x01 = FLAG_ORDERED - indicates that the dependency to the stream named in
+		PriOrDep is ordered.  It is a protocol error to set this flag if the priority
+		bit is set.</t>
               </list>
             </t>
 
             <t>Length: This frame is always 12 bytes long.</t>
 
             <t>Stream ID: The 31-bit stream ID to be updated with the required PriOrDep field.</t>
-            
-            <t>Priority bit (P), PriOrDep: A bit and 31-bit value indicating the priority or dependency to be applied to the Stream ID.  The semantics of these fields are identical to their analogues in the <xref target="SYN_STREAM">SYN_STREAM frame</xref>.</t>
+
+            <t>Priority bit (P), PriOrDep: A bit and 31-bit value indicating the priority or
+	    dependency to be applied to the Stream ID.  The semantics of these fields are
+	    identical to their analogues in the
+	    <xref target="SYN_STREAM">SYN_STREAM frame</xref>.</t>
 
           </section>  <!-- REPRI -->
-          
+
           <section anchor="FIN_ACK" title="FIN_ACK">
-            <t>The FIN_ACK control frame is sent by the client to the server to acknowledge a frame sent by the server with the FLAG_FIN bit set.  FIN acknowledgement ensures a consistent view of the active streams between the client and server.</t>
+            <t>The FIN_ACK control frame is sent by the client to the server to acknowledge a
+	    frame sent by the server with the FLAG_FIN bit set.  FIN acknowledgement ensures a
+	    consistent view of the active streams between the client and server.</t>
             <figure>
               <artwork>
           0        1        2        3         4        5        6        7
@@ -770,7 +798,7 @@
 
               </artwork>
             </figure>
-            
+
             <t>Flags: There are no valid flags for the FIN_ACK frame.</t>
 
             <t>Length: This frame is always 8 bytes long.</t>
@@ -781,7 +809,10 @@
 
           <section anchor="HeaderBlock" title="Name/Value Header Block">
 
-            <t>A Name/Value Header Block augments the streams or group of streams identified by the <xref target="SYN_STREAM">SYN_STREAM</xref>, <xref target="HEADERS">HEADERS</xref>, or <xref target="SYN_REPLY">SYN_REPLY</xref> frame stream with additional metadata.
+            <t>A Name/Value Header Block augments the streams or group of streams identified by
+	    the <xref target="SYN_STREAM">SYN_STREAM</xref>,
+	    <xref target="HEADERS">HEADERS</xref>, or <xref target="SYN_REPLY">SYN_REPLY</xref>
+	    frame stream with additional metadata.
             </t>
 
             <t>
@@ -1226,7 +1257,7 @@
 
             <t>When a client receives a SYN_STREAM from the server without a the ':host', ':scheme', and ':path' headers in the Name/Value section, it MUST reply with a RST_STREAM with error code HTTP_PROTOCOL_ERROR.</t>
 
-            <t>To cancel individual server push streams, the client can issue a <xref target="StreamErrorHandler">stream error</xref> with error code CANCEL.  Upon receipt, the server MUST stop sending on this stream immediately (this is an Abrupt termination).</t> 
+            <t>To cancel individual server push streams, the client can issue a <xref target="StreamErrorHandler">stream error</xref> with error code CANCEL.  Upon receipt, the server MUST stop sending on this stream immediately (this is an Abrupt termination).</t>
 
             <t>To cancel all server push streams related to a request, the client may issue a <xref target="StreamErrorHandler">stream error</xref> with error code CANCEL on the associated-stream-id.  By cancelling that stream, the server MUST immediately stop sending frames for any streams with in-association-to for the original stream.</t>
 
@@ -1368,7 +1399,7 @@
           <t>A subtle but important point is that server push streams must be declared before the associated stream is closed.  The reason for this is so that proxies have a lifetime for which they can discard information about previous streams.  If a pushed stream could associate itself with an already-closed stream, then endpoints would not have a specific lifecycle for when they could disavow knowledge of the streams which went before.</t>
         </section>
       </section>
-      
+
       <section title="Stream Priorities and Dependencies" anchor="DependencyPolicies">
         <t>Both priorities and stream dependencies are advisory hints.  Browsers may adopt sophisticated policies or leave dependencies entirely unspecified.  Similarly, servers may incorporate dependency hints into sophisticated schedulers or ignore them entirely.  The protocol mechanisms for encoding dependencies are designed to be simple.  But, these mechanisms afford a flexible set of policies depending on how browsers and servers use them.  This section expands on several policy considerations.</t>
 
@@ -1379,22 +1410,49 @@
         </section>
 
         <section title="Server Scheduling">
-          <t>A conformant server should respect the semantics of priorities and dependencies in its scheduling policy.  Priorities indicate a preference for weighted scheduling (e.g., using a lottery scheduler) among streams with priority values.  Streams with identical priorities should be weighted equally.</t>
-          
-          <t>Stream dependencies define a partially ordered list.  The head of the list is a stream with a priority, and each dependency link in the list has a type: either ordered or unordered.  Ordering links indicates a preference for ordering writes.  For example, an ordered dependency from script2.js to script1.js means that the client prefers to receive script1.js before script2.js.  An unordered dependency indicates that capacity should be shared, e.g., between transfers for two progressive jpeg images.</t>
+          <t>A conformant server should respect the semantics of priorities and dependencies in
+	  its scheduling policy.  Priorities indicate a preference for weighted scheduling
+	  (e.g., using a lottery scheduler) among streams with priority values.  Streams with
+	  identical priorities should be weighted equally.</t>
 
-          <t>Server scheduling should reflect guidance from dependencies, but it need not be strict.  If all the streams in a dependency list have data available to write at the server, writes should be serviced first for the head of the list, then its dependent stream,  and so on, with sharing among unordered segments of the list.  But, dependent streams that are ready to write should not starve to enforce a scheduling dependency.  In other words, scheduling dependencies should not lead servers to waste capacity.  If data is not available to continue writing to the stream at the head of a list, for example, a successor ready to write should do so.</t>
+          <t>Stream dependencies define a partially ordered list.  The head of the list is a
+	  stream with a priority, and each dependency link in the list has a type: either ordered
+	  or unordered.  Ordering links indicates a preference for ordering writes.  For example,
+	  an ordered dependency from script2.js to script1.js means that the client prefers to
+	  receive script1.js before script2.js.  An unordered dependency indicates that capacity
+	  should be shared, e.g., between transfers for two progressive jpeg images.</t>
 
-          <t>Finally, we point out that servers may improve performance even if clients do not provide dependency information or priorities.  For example, an intelligent server may inspect the content type of resources to make informed prioritization decisions on its own without client guidance.  (However, respecting client-provided hints when available is likely to improve performance further, as clients have detailed knowledge of parser dependencies.)</t>
+          <t>Server scheduling should reflect guidance from dependencies, but it need not be
+	  strict.  If all the streams in a dependency list have data available to write at the
+	  server, writes should be serviced first for the head of the list, then its dependent
+	  stream,  and so on, with sharing among unordered segments of the list.  But, dependent
+	  streams that are ready to write should not starve to enforce a scheduling dependency.
+	  In other words, scheduling dependencies should not lead servers to waste capacity.
+	  If data is not available to continue writing to the stream at the head of a list, for
+	  example, a successor ready to write should do so.</t>
+
+          <t>Finally, we point out that servers may improve performance even if clients do not
+	  provide dependency information or priorities.  For example, an intelligent server may
+	  inspect the content type of resources to make informed prioritization decisions on its
+	  own without client guidance.  (However, respecting client-provided hints when available
+	  is likely to improve performance further, as clients have detailed knowledge of parser
+	  dependencies.)</t>
         </section>
-        
+
         <section title="Garbage Collecting Dependency Information">
-          <t>SPDY implementations must take care to protect themselves from the use of dependencies as a DoS vector.  Because the dependency relationships of a stream have the same lifetime as the stream itself, servers may limit resource consumption using the MAX_CONCURRENT_STREAMS setting.</t>
-            
-          <t>Dependency relationships for a stream may be safely discarded by the server after a FIN_ACK frame is received for the stream.  Recall that all stream dependencies must refer to an active stream ID, so it is a protocol error for a client to leave a dangling dependency from an active stream to another stream for which a FIN_ACK has been sent.</t>
-        </section>  
+          <t>SPDY implementations must take care to protect themselves from the use of
+	  dependencies as a DoS vector.  Because the dependency relationships of a stream have
+	  the same lifetime as the stream itself, servers may limit resource consumption using
+	  the MAX_CONCURRENT_STREAMS setting.</t>
+
+          <t>Dependency relationships for a stream may be safely discarded by the server after a
+	  FIN_ACK frame is received for the stream.  Recall that all stream dependencies must
+	  refer to an active stream ID, so it is a protocol error for a client to leave a
+	  dangling dependency from an active stream to another stream for which a FIN_ACK has
+	  been sent.</t>
+        </section>
       </section>  <!-- Stream Priorities and Dependencies -->
-      
+
       <section title="Security Considerations">
         <section title="Use of Same-origin constraints">
           <t>This specification uses the <xref target="RFC6454">same-origin policy</xref> in all cases where verification of content is required.</t>
