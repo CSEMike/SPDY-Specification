@@ -1431,12 +1431,10 @@
 	  If data is not available to continue writing to the stream at the head of a list, for
 	  example, a successor ready to write should do so.</t>
 
-          <t>Finally, we point out that servers may improve performance even if clients do not
-	  provide dependency information or priorities.  For example, an intelligent server may
-	  inspect the content type of resources to make informed prioritization decisions on its
-	  own without client guidance.  (However, respecting client-provided hints when available
-	  is likely to improve performance further, as clients have detailed knowledge of parser
-	  dependencies.)</t>
+          <t>An intelligent server may inspect the content type of resources to make informed
+	  prioritization decisions on its own without client guidance.  However, respecting
+	  client-provided hints when available is likely to improve performance further, as
+	  clients have detailed knowledge of parser dependencies.</t>
         </section>
 
         <section title="Garbage Collecting Dependency Information">
