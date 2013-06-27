@@ -1441,7 +1441,8 @@
           <t>SPDY implementations must take care to protect themselves from the use of
 	  dependencies as a DoS vector.  Because the dependency relationships of a stream have
 	  the same lifetime as the stream itself, servers may limit resource consumption using
-	  the MAX_CONCURRENT_STREAMS setting.</t>
+	  the MAX_CONCURRENT_STREAMS setting and drop any dependency information under DoS
+	  attack or similar resource constraints.</t>
 
           <t>Dependency relationships for a stream may be safely discarded by the server after a
 	  FIN_ACK frame is received for the stream.  Recall that all stream dependencies must
